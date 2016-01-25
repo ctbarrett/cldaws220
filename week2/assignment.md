@@ -4,7 +4,10 @@
 
 - Make Your CW Billing Alert Send an SMS Text  
   - Deliverable: None  
-  ![SNS Subscription Reply](https://craigbarrett.xyz/files/aws_sms_subscription.jpg)
+  - SNS Subscription Reply:  
+  ![SNS Subscription Reply](./aws_sms_subscription.jpg)
+  - CloudWatch SNS Notification Test:  
+  ![SNS CloudWatch Notification](./aws_sms_cw_notification.png)
 - Write a Script to Send Your Phone SMS Messages  
   - Deliverable: the Messaging Script Code
 - Configure S3 Bucket to Notify on Object Creation

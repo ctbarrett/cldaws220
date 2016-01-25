@@ -1,4 +1,4 @@
-# Homework / Lab Exercises
+# Homework / Lab Exercises - Week 2
 
 ## SNS
 
@@ -46,6 +46,7 @@
         aws sns publish --topic-arn "$topic_arn" --subject "$message" --message "$message"
 
 
+## Extra (Skipped)
 - Configure S3 Bucket to Notify on Object Creation
   - Deliverable: None
 - Configure a Server to Save an HTTP/S Notification
@@ -73,3 +74,25 @@
 - Create an Alarm Based on Your Own Metric
   - Verify that It Works by Triggering the Threshold
   - Deliverable: the Command Line to Create the Alarm and Put the Metric that Triggers It
+        # Command used to create custom metric & alarm
+        $ aws cloudwatch put-metric-alarm --alarm-name cb99-cw-tstAlarm \
+        > --alarm-description 'Test for custom alarm' --namespace 'craigbarrett.xyz/TestAPI' \
+        > --metric-name 'TestCondition' --statistic Sum --period 60 --threshold 2 --unit Count \
+        > --evaluation-periods 1 --comparison-operator GreaterThanThreshold \
+        > --dimensions 'Name=API,Value=ForceFail' \
+        > --alarm-actions "arn:aws:sns:us-east-1:907677783442:NotifyMe"
+
+        # Script intended to generate random data over threshold to trigger custom alarm (didn't work)
+        #!/usr/bin/bash
+        let count=1
+        let max=45
+        let interval=2
+        while [[ $count -le $max ]]
+        do
+          echo "Pushing data point $count..."
+          aws cloudwatch put-me tric-data --namespace 'craigbarrett.xyz/TestAPI' \
+            --metric-name TestCondition --dimensions 'Name=API,Value=ForceFail' --unit Count \
+            --value $(($RANDOM%12 + 3))
+          sleep $interval
+          ((count+=1))
+        done

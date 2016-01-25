@@ -60,7 +60,16 @@
 
 - Set an Alarm When an EC2 Instance CPU Reaches 50%
   - Verify that It Works by Adding CPU Load
-  - Deliverable: the Command Line to Create the Alarm
+  - Deliverable: the Command Line to Create the Alarm  
+        $  aws cloudwatch list-metrics --namespace AWS/EC2 --metric-name CPUUtilization
+        [...]
+        $ aws cloudwatch put-metric-alarm \
+        > --alarm-name cb99-cw-ec2cpu --alarm-description "EC2 CPU Utilization (>50%)" \
+        > --namespace 'AWS/EC2' --metric-name CPUUtilization --statistic Average \
+        > --period 300 --evaluation-periods 2 --threshold 50 --unit Percent \
+        > --comparison-operator GreaterThanThreshold \
+        > --dimensions "Name=InstanceID,Value=i-b6ef0536" \
+        > --alarm-actions "arn:aws:sns:us-east-1:907677783442:NotifyMe"
 - Create an Alarm Based on Your Own Metric
   - Verify that It Works by Triggering the Threshold
   - Deliverable: the Command Line to Create the Alarm and Put the Metric that Triggers It

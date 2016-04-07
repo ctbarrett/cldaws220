@@ -277,8 +277,91 @@ $ aws dynamodb delete-table --table-name server_roles
 
 ## Create a DynamoDB Table With a Hash/Range Key
 
+```bash
+$ aws dynamodb create-table \
+> --table-name service_requests \
+> --key-schema AttributeName=account_id,KeyType=HASH AttributeName=request_id,KeyType=RANGE \
+> --attribute-definitions AttributeName=account_id,AttributeType=S AttributeName=request_id,AttributeType=N \
+> --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+{
+    "TableDescription": {
+        "TableArn": "arn:aws:dynamodb:us-east-1:123456789012:table/service-requests",
+        "AttributeDefinitions": [
+            {
+                "AttributeName": "account_id",
+                "AttributeType": "S"
+            },
+            {
+                "AttributeName": "request_id",
+                "AttributeType": "N"
+            }
+        ],
+        "ProvisionedThroughput": {
+            "NumberOfDecreasesToday": 0,
+            "WriteCapacityUnits": 5,
+            "ReadCapacityUnits": 5
+        },
+        "TableSizeBytes": 0,
+        "TableName": "service-requests",
+        "TableStatus": "CREATING",
+        "KeySchema": [
+            {
+                "KeyType": "HASH",
+                "AttributeName": "account_id"
+            },
+            {
+                "KeyType": "RANGE",
+                "AttributeName": "request_id"
+            }
+        ],
+        "ItemCount": 0,
+        "CreationDateTime": 1459999678.255
+    }
+}
+```
+
 ## Use a Range Key Having a Numeric Value
+
+```bash
+$ aws dynamodb put-item --table-name service-requests --item \
+'{
+  "account_id": {"S": "bob@accounting.example.com"},
+  "request_id": {"N": "000001"},
+  "subject": {"S": "Broken screen"},
+  "notes": {"S": "Monitor stays blank after power on"}
+}'
+```
 
 ## Insert Items Using Same Hash Key, Varying Range Key
 
+```bash
+$ aws dynamodb put-item --table-name service-requests --item \
+> '{
+>   "account_id": {"S": "bob@accounting.example.com"},
+>   "request_id": {"N": "000003"},
+>   "subject": {"S": "Replacement monitor"},
+>   "notes": {"S": "Customer tried troubleshooting blank screen, accidentally dropped paperclip across plug blades while plugged in, fried the monitor. Needs new monitor ordered"}
+> }'
+```
+
 ## Query for the Items Using the Range Key
+
+```bash
+$ aws dynamodb get-item --table-name service-requests --key '{"account_id": {"S": "bob@accounting.example.com"}, "request_id": {"N": "000003"}}'
+{
+    "Item": {
+        "notes": {
+            "S": "Customer tried troubleshooting blank screen, accidentally dropped paperclip across plug blades while plugged in, fried the monitor. Needs new monitor ordered"
+        },
+        "request_id": {
+            "N": "3"
+        },
+        "account_id": {
+            "S": "bob@accounting.example.com"
+        },
+        "subject": {
+            "S": "Replacement monitor"
+        }
+    }
+}
+```

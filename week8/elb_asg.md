@@ -444,6 +444,7 @@ Connection: keep-alive
 
 ```bash
 # Checked monitoring graphs and deleted load balancer
+# (forgot to screenshot monitoring graphs for initial ELB, so graphs from the auto-scaling ELB were used, instead)
 $ aws elb delete-load-balancer --load-balancer-name cb99-elb-test
 $
 

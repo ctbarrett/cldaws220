@@ -289,7 +289,6 @@ $
 ```bash
 # Start monitor loop
 $ while : ; do echo "$(date '+%H:%M:%S:') $(curl -s http://cb99-elb-test-328870456.us-west-2.elb.amazonaws.com/)"; sleep 1; done
-while : ; do echo "$(date '+%H:%M:%S:') $(curl -s http://cb99-elb-test-328870456.us-west-2.elb.amazonaws.com/)"; sleep 1; done
 21:15:10: hello from ip-172-31-46-219
 21:15:11: hello from ip-172-31-18-6
 21:15:13: hello from ip-172-31-9-51

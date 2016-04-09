@@ -60,7 +60,7 @@ $ aws elb describe-load-balancers
             ],
             "Scheme": "internet-facing",
             "SourceSecurityGroup": {
-                "OwnerAlias": "907677783442",
+                "OwnerAlias": "123456789012",
                 "GroupName": "cb99 ELB test"
             }
         }
@@ -75,7 +75,7 @@ $ aws elb describe-load-balancers
 $ aws ec2 run-instances --image-id ami-31d63951 --key-name cb99-w2 --security-group-ids sg-967e36f1 --instance-type t2.micro --subnet-id subnet-9a1023ff
 
 {
-    "OwnerId": "907677783442",
+    "OwnerId": "123456789012",
     "ReservationId": "r-0cd4ddc9",
     "Groups": [],
     "Instances": [
@@ -138,7 +138,7 @@ $ aws ec2 run-instances --image-id ami-31d63951 --key-name cb99-w2 --security-gr
                         }
                     ],
                     "SubnetId": "subnet-9a1023ff",
-                    "OwnerId": "907677783442",
+                    "OwnerId": "123456789012",
                     "PrivateIpAddress": "172.31.18.6"
                 }
             ],
@@ -264,7 +264,7 @@ $ aws elb describe-load-balancers
             ],
             "Scheme": "internet-facing",
             "SourceSecurityGroup": {
-                "OwnerAlias": "907677783442",
+                "OwnerAlias": "123456789012",
                 "GroupName": "cb99 ELB test"
             }
         }
@@ -440,18 +440,524 @@ Connection: keep-alive
 
 ### Lab 5 - ELB: Delete ELB
 
+![ELB Monitoring Graphs](https://raw.githubusercontent.com/ctbarrett/cldaws220/master/week8/elb_monitors.png)
+
 ```bash
-# Checked monitoring graphs and deleted load balancer (forgot to screenshot graphs)
+# Checked monitoring graphs and deleted load balancer
 $ aws elb delete-load-balancer --load-balancer-name cb99-elb-test
 $
+
 ```
 
 ### Lab 6 - ASG: Create Auto-Scaling Group
 
+```bash
+# Create a launch configuration
+$ aws autoscaling create-launch-configuration --launch-configuration-name cb99-launch-cfg --image-id ami-31d63951 --key-name cb99-w2 --security-groups sg-967e36f1 --instance-type t2.micro
+
+# Create an autoscaling group
+$ aws autoscaling create-auto-scaling-group --auto-scaling-group-name cb99-asg-test --launch-configuration-name cb99-launch-cfg --min-size 2 --max-size 4 --availability-zones us-west-2a us-west-2b us-west-2c
+
+# List the autoscaling instances
+$ aws autoscaling describe-auto-scaling-instances
+{
+    "AutoScalingInstances": [
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2b",
+            "InstanceId": "i-26a8aee1",
+            "AutoScalingGroupName": "cb99-asg-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2a",
+            "InstanceId": "i-ba97c662",
+            "AutoScalingGroupName": "cb99-asg-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        }
+    ]
+}
+
+# Remove an instance
+$ aws autoscaling terminate-instance-in-auto-scaling-group --instance-id i-ba97c662 --no-should-decrement-desired-capacity
+{
+    "Activity": {
+        "Description": "Terminating EC2 instance: i-ba97c662",
+        "ActivityId": "37abd34d-b2e4-4c9c-b79f-7515c46b67d1",
+        "Details": "{\"Availability Zone\":\"us-west-2a\"}",
+        "StartTime": "2016-04-09T05:01:39.043Z",
+        "Progress": 0,
+        "Cause": "At 2016-04-09T05:01:39Z instance i-ba97c662 was taken out of service in response to a user request.",
+        "StatusCode": "InProgress"
+    }
+}
+
+# Note the replacement instance launched (Pending) to backfill the old instance (Terminating)
+$ aws autoscaling describe-auto-scaling-instances
+{
+    "AutoScalingInstances": [
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2b",
+            "InstanceId": "i-26a8aee1",
+            "AutoScalingGroupName": "cb99-asg-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2a",
+            "InstanceId": "i-8399c85b",
+            "AutoScalingGroupName": "cb99-asg-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "Pending",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2a",
+            "InstanceId": "i-ba97c662",
+            "AutoScalingGroupName": "cb99-asg-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "Terminating",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        }
+    ]
+}
+
+```
+
 ### Lab 7 - ASG: Create ASG with ELB
+
+```bash
+# Recreate ELB
+$ aws elb create-load-balancer --load-balancer-name cb99-elb-test --listeners "Protocol=HTTP,LoadBalancerPort=80,InstanceProtocol=HTTP,InstancePort=4567" --subnets subnet-9a1023ff subnet-0494fd5d subnet-6f540518 --security-groups sg-7c7e361b
+{
+    "DNSName": "cb99-elb-test-2034046900.us-west-2.elb.amazonaws.com"
+}
+
+# Create new ASG with the recreated ELB
+$ aws autoscaling create-auto-scaling-group --auto-scaling-group-name cb99-asg-elb-test --launch-configuration-name cb99-launch-cfg --min-size 2 --max-size 4 --load-balancer-names cb99-elb-test --availability-zones us-west-2a us-west-2b us-west-2c
+
+# Test connectivity to new instances and traffic distribution
+$ while : ; do curl http://cb99-elb-test-2034046900.us-west-2.elb.amazonaws.com/; sleep 1; done
+hello from ip-172-31-38-65
+hello from ip-172-31-13-205
+hello from ip-172-31-38-65
+hello from ip-172-31-13-205
+hello from ip-172-31-38-65
+^C
+```
 
 ### Lab 8 - ASG: Health check
 
+```bash
+# setup curl monitor
+$ while : ; do echo "$(date '+%H:%M:%S:') $(curl -s http://cb99-elb-test-2034046900.us-west-2.elb.amazonaws.com/)"; sleep 1; done
+22:11:56: hello from ip-172-31-13-205
+22:11:57: hello from ip-172-31-38-65
+22:11:58: hello from ip-172-31-13-205
+22:11:59: hello from ip-172-31-38-65
+22:12:00: hello from ip-172-31-13-205
+22:12:01: hello from ip-172-31-38-65
+22:12:02: hello from ip-172-31-13-205
+22:12:03: hello from ip-172-31-38-65
+22:12:04: hello from ip-172-31-13-205
+...
+
+# SSH into one of the instances, and kill the webapp
+[ec2-user@ip-172-31-13-205 ~]$ pgrep -fl ruby
+2214 ruby -rsinatra -e set :bind, "0.0.0.0"; get "/" do; sleep params[:sleep].to_i if params[:sleep]; "hello from #{`hostname`}"; end; get "/png" do; "healthy\n"; end
+[ec2-user@ip-172-31-13-205 ~]$ sudo pkill -9 ruby
+
+# Noted the connections failing
+22:16:10: hello from ip-172-31-13-205
+22:16:12: hello from ip-172-31-38-65
+22:16:13: hello from ip-172-31-13-205
+22:16:14: hello from ip-172-31-38-65
+22:16:15: hello from ip-172-31-13-205
+22:16:16: hello from ip-172-31-38-65
+22:16:17: hello from ip-172-31-38-65
+22:16:18: hello from ip-172-31-38-65
+22:16:19: hello from ip-172-31-38-65
+22:16:20: hello from ip-172-31-38-65
+...
+
+# No new instances were added to the ASG
+$ aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name cb99-asg-elb-test
+{
+    "AutoScalingGroups": [
+        {
+            "AutoScalingGroupARN": "arn:aws:autoscaling:us-west-2:123456789012:autoScalingGroup:2ad5f578-96cd-4cd1-879c-3f9f8054ef3e:autoScalingGroupName/cb99-asg-elb-test",
+            "HealthCheckGracePeriod": 0,
+            "SuspendedProcesses": [],
+            "DesiredCapacity": 2,
+            "Tags": [],
+            "EnabledMetrics": [],
+            "LoadBalancerNames": [
+                "cb99-elb-test"
+            ],
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "DefaultCooldown": 300,
+            "MinSize": 2,
+            "Instances": [
+                {
+                    "ProtectedFromScaleIn": false,
+                    "AvailabilityZone": "us-west-2a",
+                    "InstanceId": "i-8498c95c",
+                    "HealthStatus": "Healthy",
+                    "LifecycleState": "InService",
+                    "LaunchConfigurationName": "cb99-launch-cfg"
+                },
+                {
+                    "ProtectedFromScaleIn": false,
+                    "AvailabilityZone": "us-west-2c",
+                    "InstanceId": "i-7c7e68a6",
+                    "HealthStatus": "Healthy",
+                    "LifecycleState": "InService",
+                    "LaunchConfigurationName": "cb99-launch-cfg"
+                }
+            ],
+            "MaxSize": 4,
+            "VPCZoneIdentifier": "",
+            "TerminationPolicies": [
+                "Default"
+            ],
+            "LaunchConfigurationName": "cb99-launch-cfg",
+            "CreatedTime": "2016-04-09T05:05:00.101Z",
+            "AvailabilityZones": [
+                "us-west-2c",
+                "us-west-2b",
+                "us-west-2a"
+            ],
+            "HealthCheckType": "EC2",
+            "NewInstancesProtectedFromScaleIn": false
+        }
+    ]
+}
+
+$ aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name cb99-asg-elb-test
+{
+    "AutoScalingGroups": [
+        {
+            "AutoScalingGroupARN": "arn:aws:autoscaling:us-west-2:123456789012:autoScalingGroup:2ad5f578-96cd-4cd1-879c-3f9f8054ef3e:autoScalingGroupName/cb99-asg-elb-test",
+            "HealthCheckGracePeriod": 0,
+            "SuspendedProcesses": [],
+            "DesiredCapacity": 2,
+            "Tags": [],
+            "EnabledMetrics": [],
+            "LoadBalancerNames": [
+                "cb99-elb-test"
+            ],
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "DefaultCooldown": 300,
+            "MinSize": 2,
+            "Instances": [
+                {
+                    "ProtectedFromScaleIn": false,
+                    "AvailabilityZone": "us-west-2a",
+                    "InstanceId": "i-8498c95c",
+                    "HealthStatus": "Healthy",
+                    "LifecycleState": "InService",
+                    "LaunchConfigurationName": "cb99-launch-cfg"
+                },
+                {
+                    "ProtectedFromScaleIn": false,
+                    "AvailabilityZone": "us-west-2c",
+                    "InstanceId": "i-7c7e68a6",
+                    "HealthStatus": "Healthy",
+                    "LifecycleState": "InService",
+                    "LaunchConfigurationName": "cb99-launch-cfg"
+                }
+            ],
+            "MaxSize": 4,
+            "VPCZoneIdentifier": "",
+            "TerminationPolicies": [
+                "Default"
+            ],
+            "LaunchConfigurationName": "cb99-launch-cfg",
+            "CreatedTime": "2016-04-09T05:05:00.101Z",
+            "AvailabilityZones": [
+                "us-west-2c",
+                "us-west-2b",
+                "us-west-2a"
+            ],
+            "HealthCheckType": "EC2",
+            "NewInstancesProtectedFromScaleIn": false
+        }
+    ]
+}
+
+$ aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name cb99-asg-elb-test
+{
+    "AutoScalingGroups": [
+        {
+            "AutoScalingGroupARN": "arn:aws:autoscaling:us-west-2:123456789012:autoScalingGroup:2ad5f578-96cd-4cd1-879c-3f9f8054ef3e:autoScalingGroupName/cb99-asg-elb-test",
+            "HealthCheckGracePeriod": 0,
+            "SuspendedProcesses": [],
+            "DesiredCapacity": 2,
+            "Tags": [],
+            "EnabledMetrics": [],
+            "LoadBalancerNames": [
+                "cb99-elb-test"
+            ],
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "DefaultCooldown": 300,
+            "MinSize": 2,
+            "Instances": [
+                {
+                    "ProtectedFromScaleIn": false,
+                    "AvailabilityZone": "us-west-2a",
+                    "InstanceId": "i-8498c95c",
+                    "HealthStatus": "Healthy",
+                    "LifecycleState": "InService",
+                    "LaunchConfigurationName": "cb99-launch-cfg"
+                },
+                {
+                    "ProtectedFromScaleIn": false,
+                    "AvailabilityZone": "us-west-2c",
+                    "InstanceId": "i-7c7e68a6",
+                    "HealthStatus": "Healthy",
+                    "LifecycleState": "InService",
+                    "LaunchConfigurationName": "cb99-launch-cfg"
+                }
+            ],
+            "MaxSize": 4,
+            "VPCZoneIdentifier": "",
+            "TerminationPolicies": [
+                "Default"
+            ],
+            "LaunchConfigurationName": "cb99-launch-cfg",
+            "CreatedTime": "2016-04-09T05:05:00.101Z",
+            "AvailabilityZones": [
+                "us-west-2c",
+                "us-west-2b",
+                "us-west-2a"
+            ],
+            "HealthCheckType": "EC2",
+            "NewInstancesProtectedFromScaleIn": false
+        }
+    ]
+}
+
+# Update health check type
+$ aws autoscaling update-auto-scaling-group --auto-scaling-group-name cb99-asg-elb-test --health-check-type ELB --health-check-grace-period 30
+
+# Downed instance was terminated
+[ec2-user@ip-172-31-13-205 ~]$ sudo pkill -9 ruby
+[ec2-user@ip-172-31-13-205 ~]$
+Broadcast message from root@ip-172-31-13-205
+  (unknown) at 5:29 ...
+
+The system is going down for power off NOW!
+Connection to ec2-52-37-126-37.us-west-2.compute.amazonaws.com closed by remote host.
+Connection to ec2-52-37-126-37.us-west-2.compute.amazonaws.com closed.
+
+$ aws autoscaling describe-auto-scaling-instances
+{
+    "AutoScalingInstances": [
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2b",
+            "InstanceId": "i-26a8aee1",
+            "AutoScalingGroupName": "cb99-asg-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2c",
+            "InstanceId": "i-7c7e68a6",
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "HealthStatus": "UNHEALTHY",
+            "LifecycleState": "Terminating",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2a",
+            "InstanceId": "i-8399c85b",
+            "AutoScalingGroupName": "cb99-asg-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2a",
+            "InstanceId": "i-8498c95c",
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        }
+    ]
+}
+
+# A new instance was started
+$ aws autoscaling describe-auto-scaling-instances
+{
+    "AutoScalingInstances": [
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2b",
+            "InstanceId": "i-26a8aee1",
+            "AutoScalingGroupName": "cb99-asg-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2c",
+            "InstanceId": "i-7c7e68a6",
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "HealthStatus": "UNHEALTHY",
+            "LifecycleState": "Terminating",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2a",
+            "InstanceId": "i-8399c85b",
+            "AutoScalingGroupName": "cb99-asg-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2a",
+            "InstanceId": "i-8498c95c",
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2b",
+            "InstanceId": "i-a4b0b663",
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "Pending",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        }
+    ]
+}
+
+# New instance entered service automatically
+22:30:53: hello from ip-172-31-38-65
+22:30:54: hello from ip-172-31-38-65
+22:30:55: hello from ip-172-31-38-65
+22:30:56: hello from ip-172-31-38-65
+22:30:57: hello from ip-172-31-31-134
+22:30:58: hello from ip-172-31-38-65
+22:30:59: hello from ip-172-31-31-134
+22:31:00: hello from ip-172-31-38-65
+22:31:01: hello from ip-172-31-31-134
+22:31:02: hello from ip-172-31-38-65
+22:31:04: hello from ip-172-31-31-134
+22:31:05: hello from ip-172-31-38-65
+22:31:06: hello from ip-172-31-31-134
+22:31:07: hello from ip-172-31-38-65
+22:31:08: hello from ip-172-31-31-134
+22:31:09: hello from ip-172-31-38-65
+22:31:10: hello from ip-172-31-31-134
+22:31:11: hello from ip-172-31-38-65
+22:31:12: hello from ip-172-31-31-134
+22:31:13: hello from ip-172-31-38-65
+^C
+```
+
 ### Lab 9 - ASG: Manual scaling
 
-### Lab 10 - ASG: Dynamic scaling (optional)
+```bash
+# Set desired capacity to 4
+$ aws autoscaling set-desired-capacity --auto-scaling-group-name cb99-asg-elb-test --desired-capacity 4
+
+# New servers coming online
+$ aws autoscaling describe-auto-scaling-instances
+{
+    "AutoScalingInstances": [
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2b",
+            "InstanceId": "i-26a8aee1",
+            "AutoScalingGroupName": "cb99-asg-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2a",
+            "InstanceId": "i-8399c85b",
+            "AutoScalingGroupName": "cb99-asg-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2a",
+            "InstanceId": "i-8498c95c",
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2c",
+            "InstanceId": "i-a27a6c78",
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "Pending",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2c",
+            "InstanceId": "i-a37a6c79",
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "Pending",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        },
+        {
+            "ProtectedFromScaleIn": false,
+            "AvailabilityZone": "us-west-2b",
+            "InstanceId": "i-a4b0b663",
+            "AutoScalingGroupName": "cb99-asg-elb-test",
+            "HealthStatus": "HEALTHY",
+            "LifecycleState": "InService",
+            "LaunchConfigurationName": "cb99-launch-cfg"
+        }
+    ]
+}
+
+# responses from all 4 web servers
+...
+22:39:28: hello from ip-172-31-38-65
+22:39:29: hello from ip-172-31-3-141
+22:39:30: hello from ip-172-31-18-134
+22:39:31: hello from ip-172-31-31-134
+22:39:32: hello from ip-172-31-38-65
+22:39:33: hello from ip-172-31-3-141
+22:39:34: hello from ip-172-31-18-134
+22:39:35: hello from ip-172-31-31-134
+22:39:36: hello from ip-172-31-38-65
+22:39:37: hello from ip-172-31-3-141
+22:39:38: hello from ip-172-31-18-134
+22:39:40: hello from ip-172-31-31-134
+22:39:41: hello from ip-172-31-38-65
+
+```
